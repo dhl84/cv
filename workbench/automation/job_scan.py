@@ -87,7 +87,8 @@ def main():
     scored = []
     for j in found:
         s, floor, why = score(j, profile_text) if "--no-score" not in sys.argv else (-1, "unknown", "")
-        seen[j["id"]] = {"date": TODAY, "score": s, "title": j["title"], "company": j["company"]}
+        if s >= 0 or "--no-score" in sys.argv:   # a failed model call leaves the job unseen so it is retried tomorrow
+            seen[j["id"]] = {"date": TODAY, "score": s, "title": j["title"], "company": j["company"]}
         scored.append((s, floor, why, j))
         print(f"  {s:>2} {floor:<7} {j['company']:<16} {j['title']}")
     save_json("seen_jobs.json", seen)

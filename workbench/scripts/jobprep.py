@@ -87,6 +87,7 @@ def chat_stream(model, messages, num_ctx, temperature):
         "model": model,
         "messages": messages,
         "stream": True,
+        "think": False,   # gemma4/qwen3 otherwise spend the budget thinking and stream nothing
         "options": {"num_ctx": num_ctx, "temperature": temperature},
     }).encode()
     req = urllib.request.Request(

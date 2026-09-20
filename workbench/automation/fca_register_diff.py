@@ -33,6 +33,10 @@ def main():
             continue
         cur = parse(raw)
         prev = load_json(f"fca_{key}_prev.json", {})
+        if not cur or (prev and len(cur) < 0.5 * len(prev)):
+            # an error page or truncated file parses as few/no rows; keep yesterday's baseline
+            lines.append(f"- {key.upper()} register: download looks truncated ({len(cur)} rows vs {len(prev)} stored); baseline kept, no diff today")
+            continue
         new, changed = [], []
         for frn, r in cur.items():
             st = r.get(status_col, "").strip()

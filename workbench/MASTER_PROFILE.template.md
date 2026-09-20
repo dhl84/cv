@@ -16,6 +16,7 @@
 4. **Length discipline.** A CV fits 2 pages of the LaTeX template: summary ~120 words, competencies ~110 words, 14–20 experience bullets.
 5. **Figures are approximate and pre-hedged.** Keep the hedges. Do not sharpen them.
 6. **Output location.** Per-application artefacts go in `applications/<company>-<role>-<YYYYMMDD>/`.
+7. **Source boundaries.** Use confirmed dates and qualifications from your own records. Do not load raw payroll, contracts or restricted documents into prompts. Do not turn a prototype, a forecast or a recruitment exercise into an employment achievement. If a date is flagged `VERIFY:`, ask before using an exact chronology.
 
 ## 1. Identity & contact
 
