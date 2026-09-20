@@ -16,7 +16,7 @@ Three scripts run once a day, write one Markdown report to `gtm/daily/YYYY-MM-DD
 2. Run the scripts once by hand to store the register baseline and the seen-jobs list:
 
    ```powershell
-   cd C:\Users\lee_h\cv\gtm\automation
+   cd <repo>\workbench\automation
    .\daily.ps1 -Drafts 1 -Open
    ```
 
