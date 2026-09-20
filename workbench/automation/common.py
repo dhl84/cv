@@ -72,12 +72,13 @@ def write_targets(rows):
             w.writerow({c: r.get(c, "") for c in cols})
 
 
-def ollama(prompt, system="", model=None, temperature=0.3, num_ctx=32768, timeout=600):
+def ollama(prompt, system="", model=None, temperature=0.3, num_ctx=16384, timeout=600):
     """One-shot chat completion against the local Ollama server. Returns text or ''."""
     body = json.dumps({
         "model": model or MODEL,
         "messages": ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}],
         "stream": False,
+        "think": False,   # gemma4/qwen3 otherwise spend the whole budget thinking and return empty content
         "options": {"temperature": temperature, "num_ctx": num_ctx},
     }).encode()
     req = urllib.request.Request(f"{OLLAMA}/api/chat", data=body, headers={"Content-Type": "application/json"})
