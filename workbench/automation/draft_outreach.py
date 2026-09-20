@@ -2,7 +2,7 @@
 email for each with the local model from the approved template, and put the drafts in
 gtm/outbox/ for review. Marks the row 'drafted'. Nothing is sent by this script.
 
-Usage: python draft_outreach.py [N]   (default 3 per day; 0 disables)
+Usage: python draft_outreach.py [N]   (default 0; the plan is inbound-led, so pass N by hand)
 """
 import re, sys
 from common import *
@@ -20,7 +20,7 @@ SYSTEM = (
 
 
 def main():
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     if n <= 0:
         return
     rows = read_targets()

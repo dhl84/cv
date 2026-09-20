@@ -1,7 +1,7 @@
 # Daily income automation runner. Registered with Task Scheduler by register_task.ps1.
 # Order matters: register diff feeds the target list that draft_outreach reads.
 param(
-    [int]$Drafts = 3,          # prospect emails to draft per day (0 = none)
+    [int]$Drafts = 0,          # prospect emails to draft per day (0 = none; inbound-led plan, §06 Channel E)
     [switch]$NoScore,          # skip local-model scoring of jobs (fast, no GPU)
     [switch]$Open              # open today's report when done
 )
