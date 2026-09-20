@@ -37,7 +37,7 @@ def ashby(slug):
     for j in d.get("jobs", []):
         comp = (j.get("compensation") or {}).get("compensationTierSummary", "")
         yield {"id": f"ab:{slug}:{j['id']}", "company": slug, "title": j["title"], "location": j.get("location", ""),
-               "url": j.get("jobUrl", ""), "desc": (strip_html(j.get("descriptionPlain") or j.get("descriptionHtml", "")) + (f" COMPENSATION: {comp}" if comp else ""))[:6000],
+               "url": j.get("jobUrl", ""), "desc": strip_html(j.get("descriptionPlain") or j.get("descriptionHtml", ""))[:6000], "compensation": comp,
                "posted": (j.get("publishedAt") or "")[:10]}
 
 
@@ -61,9 +61,10 @@ SCORE_SYSTEM = (
 
 
 def score(job, profile_text):
-    prompt = (f"Title: {job['title']}\nCompany: {job['company']}\nLocation: {job['location']}\n\nAdvert:\n{job['desc'][:5000]}")
+    prompt = (f"Title: {job['title']}\nCompany: {job['company']}\nLocation: {job['location']}\n"
+              f"Compensation: {job.get('compensation') or 'not stated'}\n\nAdvert:\n{job['desc'][:5000]}")
     out = ollama(prompt, system=SCORE_SYSTEM + profile_text, temperature=0.1)
-    m = re.search(r"SCORE:\s*(\d+)", out)
+    m = re.search(r"^SCORE: *([0-9]|10) *$", out, re.MULTILINE)
     f = re.search(r"FLOOR:\s*(\w+)", out)
     w = re.search(r"WHY:\s*(.+)", out)
     b = re.search(r"BAND:\s*(.+)", out)
@@ -75,30 +76,33 @@ def score(job, profile_text):
 
 def main():
     seen = load_json("seen_jobs.json", {})
+    no_score = "--no-score" in sys.argv
     profile_text = "# PROFILE\n" + profile_section(2)[:6000] + "\n" + profile_section(7) + "\n" + profile_section(10)
     found, errors = [], 0
     for prov, fn in PROVIDERS.items():
         for slug in WL.get(prov, []):
             try:
                 for j in fn(slug):
-                    if j["id"] in seen or not TITLE.search(j["title"]) or EXCL.search(j["title"]):
+                    previous = seen.get(j["id"], {})
+                    completed = type(previous.get("score")) is int and 0 <= previous["score"] <= 10
+                    if completed or (no_score and j["id"] in seen) or not TITLE.search(j["title"]) or EXCL.search(j["title"]):
                         continue
                     if j["location"] and not LOC.search(j["location"]) and not LOC.search(j["desc"][:800]):
                         continue
                     found.append(j)
             except Exception:  # noqa: BLE001  (404 for wrong slug, rate limit, etc.)
                 errors += 1
-    print(f"{len(found)} new matching roles, {errors} boards unreachable")
+    print(f"{len(found)} matching roles new or awaiting scoring, {errors} boards unreachable")
     scored = []
     for j in found:
-        s, floor, why = score(j, profile_text) if "--no-score" not in sys.argv else (-1, "unknown", "")
-        if s >= 0 or "--no-score" in sys.argv:   # a failed model call leaves the job unseen so it is retried tomorrow
+        s, floor, why = score(j, profile_text) if not no_score else (-1, "unknown", "")
+        if 0 <= s <= 10 or no_score:
             seen[j["id"]] = {"date": TODAY, "score": s, "title": j["title"], "company": j["company"]}
         scored.append((s, floor, why, j))
         print(f"  {s:>2} {floor:<7} {j['company']:<16} {j['title']}")
     save_json("seen_jobs.json", seen)
     scored.sort(key=lambda x: -x[0])
-    lines = [f"{len(found)} new roles matched the title filter; {errors} boards unreachable (wrong slug or rate limit).", ""]
+    lines = [f"{len(found)} roles new or awaiting scoring matched the title filter; {errors} boards unreachable (wrong slug or rate limit).", ""]
     for s, floor, why, j in scored:
         lines.append(f"- **{s}/10** {'(floor ok)' if floor=='yes' else '(floor '+floor+')'} [{j['title']}]({j['url']}) at {j['company']}, {j['location'] or 'location unstated'}{', posted '+j['posted'] if j['posted'] else ''}  \n  {why}")
     if not scored:

@@ -5,7 +5,7 @@ Three scripts run once a day, write one Markdown report to `gtm/daily/YYYY-MM-DD
 | Script | What it does | Needs the GPU |
 |---|---|---|
 | `fca_register_diff.py` | Downloads the FCA e-money and PSD register extracts, diffs them against yesterday, reports newly authorised firms and status changes, and adds new authorised EMIs and PIs to `target-list.csv` as Tier 1. | No |
-| `job_scan.py` | Polls the Greenhouse, Lever, Ashby and Workable boards listed in `watchlist.json`, keeps finance titles in London, scores each new advert 0 to 10 against `MASTER_PROFILE.md` sections 2, 7 and 10 with the local model, and flags whether the advert meets the salary floor in the profile. | Yes (add `--no-score` to skip) |
+| `job_scan.py` | Polls the Greenhouse, Lever, Ashby and Workable boards listed in `watchlist.json`, keeps finance titles in London, scores each new advert 0 to 10 against `MASTER_PROFILE.md` sections 2, 7 and 10 with the local model, and flags whether the advert meets the £80k floor. | Yes (add `--no-score` to skip) |
 | `draft_outreach.py N` | Takes the next N targets with status `not started`, drafts the prospect email from `prospect-template.md` with the local model, writes each draft to `gtm/outbox/`, and marks the row `drafted`. Default N is 3. | Yes |
 
 `daily.ps1` runs the three in order and starts Ollama if it is not running. `register_task.ps1` puts `daily.ps1` in Windows Task Scheduler at 07:00.
@@ -45,6 +45,20 @@ cd gtm/automation && python3 fca_register_diff.py && python3 job_scan.py && pyth
 To run it daily, put a `launchd` plist in `~/Library/LaunchAgents/` that runs `daily.sh` (the three `python3` lines above) at 07:00, or run it by hand when you open the laptop. Keep the state folder in the repo so that both machines share the seen-jobs list and the register baseline: commit `gtm/automation/state/` to `cv_private` after each run, or point `DATA` in `common.py` at a synced folder.
 
 ## Tuning
+
+Jobs with a saved score of -1 remain pending. A normal scan retries them while they
+are still on the board and match the filters. `--no-score` records new jobs without
+scoring them; the next normal scan can score them. Completed scores from 0 to 10
+are skipped. Ashby compensation is passed separately from the shortened advert.
+
+Register downloads must contain the expected columns and valid, unique FRNs.
+If a download loses any stored FRN or clears a previously populated status, the
+script keeps the baseline and skips that source's changes. Genuine removals need
+manual review before replacing the baseline. These checks cannot prove that an
+initial download is complete.
+
+Run offline regression checks from the project root with
+`python -B -m unittest discover -s tests -v`. They do not call a model or website.
 
 - `watchlist.json`: add a company by its ATS slug. A wrong slug costs nothing (404 is skipped). To find the slug, open the company's careers page and read the URL after `boards.greenhouse.io/`, `jobs.lever.co/`, `jobs.ashbyhq.com/` or `apply.workable.com/`.
 - `title_regex` and `exclude_regex` in the same file control which titles survive. The location filter passes adverts with no stated location, so expect some non-UK noise from global boards; the score sorts it out.

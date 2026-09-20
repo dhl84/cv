@@ -14,10 +14,23 @@ SOURCES = {
 IN_SCOPE = ("Authorised Electronic Money Institution", "Small Electronic Money Institution", "Authorised Payment Institution")
 
 
-def parse(raw):
-    text = raw.decode("utf-8-sig", errors="replace")
-    rows = list(csv.DictReader(io.StringIO(text)))
-    return {r["FRN"].strip(): r for r in rows if r.get("FRN")}
+def parse(raw, status_col, date_col):
+    reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")), strict=True)
+    required = {"FRN", "Firm", status_col, date_col}
+    headers = reader.fieldnames or []
+    if not required.issubset(headers) or len(headers) != len(set(headers)):
+        raise ValueError("missing or duplicate register columns")
+    rows = {}
+    for row in reader:
+        if None in row or any(row[c] is None for c in required):   # extra fields, or a short row; the trailing "Data listed here..." column is legitimately empty
+            raise ValueError("malformed register row")
+        frn = row["FRN"].strip()
+        if not frn or not row["Firm"].strip() or frn in rows:
+            raise ValueError("blank FRN/firm or duplicate FRN")
+        rows[frn] = row
+    if not rows:
+        raise ValueError("empty register")
+    return rows
 
 
 def main():
@@ -31,11 +44,19 @@ def main():
         except Exception as e:  # noqa: BLE001
             lines.append(f"- {key.upper()} register: download failed ({e})")
             continue
-        cur = parse(raw)
         prev = load_json(f"fca_{key}_prev.json", {})
-        if not cur or (prev and len(cur) < 0.5 * len(prev)):
-            # an error page or truncated file parses as few/no rows; keep yesterday's baseline
-            lines.append(f"- {key.upper()} register: download looks truncated ({len(cur)} rows vs {len(prev)} stored); baseline kept, no diff today")
+        try:
+            cur = parse(raw, status_col, date_col)
+            missing = prev.keys() - cur.keys()
+            if len(missing) > 0.01 * len(prev):
+                # a genuine removal is rare and small; a large gap means a truncated extract
+                raise ValueError(f"{len(missing)} stored FRNs missing; review removals before replacing the baseline")
+            for frn in sorted(missing):
+                lines.append(f"  - REMOVED {prev[frn].get('firm', '')} (FRN {frn}) no longer in the extract")
+            if any(p.get("status") and not cur[frn][status_col].strip() for frn, p in prev.items() if frn in cur):
+                raise ValueError("previously populated status is now blank")
+        except (ValueError, csv.Error) as e:
+            lines.append(f"- {key.upper()} register: invalid download ({e}); baseline kept, no diff today")
             continue
         new, changed = [], []
         for frn, r in cur.items():

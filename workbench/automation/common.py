@@ -1,14 +1,21 @@
 """Shared helpers for the daily income automations."""
 import csv, json, os, sys, datetime, urllib.request
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # cv/
-GTM = os.path.join(ROOT, "gtm")
-DATA = os.path.join(GTM, "automation", "state")
+HERE = os.path.dirname(os.path.abspath(__file__))          # .../automation
+GTM = os.path.dirname(HERE)                                  # gtm/ (private layout) or workbench/ (public layout)
+ROOT = os.path.dirname(GTM)                                  # repository root
+DATA = os.path.join(HERE, "state")
 DAILY = os.path.join(GTM, "daily")
 OUTBOX = os.path.join(GTM, "outbox")
 TARGETS = os.path.join(GTM, "target-list.csv")
-PROFILE = os.path.join(ROOT, "MASTER_PROFILE.md")
-RULES = os.path.join(ROOT, "prompts", "simple-english.md")
+
+
+def _first(*paths):
+    return next((p for p in paths if os.path.exists(p)), paths[0])
+
+
+PROFILE = _first(os.path.join(ROOT, "MASTER_PROFILE.md"), os.path.join(GTM, "MASTER_PROFILE.md"))
+RULES = _first(os.path.join(ROOT, "prompts", "simple-english.md"), os.path.join(GTM, "prompts", "simple-english.md"))
 for d in (DATA, DAILY, OUTBOX):
     os.makedirs(d, exist_ok=True)
 

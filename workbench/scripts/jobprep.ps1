@@ -47,7 +47,7 @@ param(
     [string]$Jd = '',
     [string]$Dir = '',
     [string]$Model = '',
-    [int]$Ctx = 32768,
+    [ValidateRange(1, 2147483647)][int]$Ctx = $(if ($env:JOBPREP_CTX) { [int]$env:JOBPREP_CTX } else { 49152 }),
     [double]$Temp = 0.4,
     [string]$Research = '',
     [string]$Ask = '',
