@@ -53,8 +53,9 @@ def workable(slug):
 PROVIDERS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby, "workable": workable}
 
 SCORE_SYSTEM = (
-    "You score job adverts for David H. Lee. Use only the profile below. Reply with exactly three lines:\n"
+    "You score job adverts for the candidate. Use only the profile below. Reply with exactly four lines:\n"
     "SCORE: <0-10>\nFLOOR: <yes|no|unknown> (does the advert's stated or likely base salary meet the salary floor stated in the profile?)\n"
+    "BAND: <the stated salary or range, or 'not stated'; append 'TARGET' if the top of the band meets the profile's target salary>\n"
     "WHY: <one sentence, under 30 words, naming the strongest match and the biggest gap>\n\n"
 )
 
@@ -65,7 +66,11 @@ def score(job, profile_text):
     m = re.search(r"SCORE:\s*(\d+)", out)
     f = re.search(r"FLOOR:\s*(\w+)", out)
     w = re.search(r"WHY:\s*(.+)", out)
-    return (int(m.group(1)) if m else -1, f.group(1).lower() if f else "unknown", w.group(1).strip() if w else out[:200])
+    b = re.search(r"BAND:\s*(.+)", out)
+    why = w.group(1).strip() if w else out[:200]
+    if b and "not stated" not in b.group(1).lower():
+        why += f" Band: {b.group(1).strip()}"
+    return (int(m.group(1)) if m else -1, f.group(1).lower() if f else "unknown", why)
 
 
 def main():
