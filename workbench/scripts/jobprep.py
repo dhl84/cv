@@ -433,7 +433,7 @@ def main():
     p.add_argument("--jd", default="", help="path to a job-ad file to import")
     p.add_argument("--dir", default="", help="application folder (default: auto)")
     p.add_argument("--model", default=os.environ.get("JOBPREP_MODEL", ""))
-    p.add_argument("--ctx", type=int, default=int(os.environ.get("JOBPREP_CTX", 32768)))
+    p.add_argument("--ctx", type=int, default=int(os.environ.get("JOBPREP_CTX", 49152)))
     p.add_argument("--temp", type=float, default=0.4)
     p.add_argument("--ask", default="", help="run one prompt non-interactively and exit")
     p.add_argument("--research", default="", help="run a web search into research.md and exit")
