@@ -1,0 +1,16 @@
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk
+# Python
+__pycache__/
+*.pyc
+# automation run log (state/*.json is committed on purpose so both machines share it)
+gtm/automation/state/last-run.log
+# OS
+.DS_Store
+Thumbs.db
