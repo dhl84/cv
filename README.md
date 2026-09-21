@@ -59,6 +59,7 @@ These are personal engineering projects, not finance work. Each one runs on a lo
 - [multicam_splice](https://github.com/dhl84/multicam_splice) — builds a Final Cut Pro timeline from several camera angles. It syncs the angles by audio cross-correlation and scores the confidence of each lock.
 - [hol_vids](https://github.com/dhl84/hol_vids) — builds one chronological Final Cut timeline from a folder of clips, with titles, day dividers and a chapter index.
 - [pt_vids](https://github.com/dhl84/pt_vids) — turns a recorded training session into a review list of cuts. Local transcription, then a local model classifies each spoken segment.
+- [yt_summary](https://github.com/dhl84/yt_summary) — turns a YouTube video into a Markdown brief with timestamped bullets and the facts with their units. It also keeps the links from the description and the comments that dispute the video.
 - [chatterbox-readaloud](https://github.com/dhl84/chatterbox-readaloud) — reads a page or the clipboard aloud on an Apple Silicon Mac, with on-device speech synthesis.
 
 ## Contact
