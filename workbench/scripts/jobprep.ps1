@@ -50,6 +50,8 @@ param(
     [ValidateRange(1, 2147483647)][int]$Ctx = $(if ($env:JOBPREP_CTX) { [int]$env:JOBPREP_CTX } else { 49152 }),
     [double]$Temp = 0.4,
     [string]$Research = '',
+    [switch]$FindJobs,
+    [string]$FetchJd = '',
     [string]$Ask = '',
     [switch]$NoServe
 )
@@ -62,6 +64,18 @@ $pyCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pyCmd) { $pyCmd = Get-Command python3 -ErrorAction SilentlyContinue }
 if (-not $pyCmd) { Write-Error 'Python not found on PATH. Install Python 3.9+ and retry.'; exit 1 }
 $py = $pyCmd.Source
+
+# Link discovery and advert retrieval do not need an installed/running model.
+if ($FindJobs -or $FetchJd -or $Research) {
+    $webArgs = @((Join-Path $PSScriptRoot 'jobprep.py'), '--company', $Company, '--role', $Role)
+    if ($Dir) { $webArgs += @('--dir', $Dir) }
+    if ($FindJobs) { $webArgs += '--find-jobs' }
+    if ($FetchJd) { $webArgs += @('--fetch-jd', $FetchJd) }
+    if ($Research) { $webArgs += @('--research', $Research) }
+    $env:PYTHONIOENCODING = 'utf-8'
+    & $py @webArgs
+    exit $LASTEXITCODE
+}
 
 # --- ollama ---------------------------------------------------------------
 if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {

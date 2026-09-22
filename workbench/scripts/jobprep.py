@@ -168,14 +168,17 @@ def ddg_search(query, n):
             page = _get(base + urllib.parse.quote(query))
         except Exception:
             continue
-        for m in re.finditer(r'href="(https?://[^"]+)"[^>]*>(.*?)</a>', page, re.S):
+        for m in re.finditer(r'href="([^"]+)"[^>]*>(.*?)</a>', page, re.S):
             url, title = html.unescape(m.group(1)), strip_html(m.group(2))
-            if "duckduckgo.com" in url or not title or len(title) < 8:
-                continue
+            url = urllib.parse.urljoin(base, url)
             if "uddg=" in url:  # unwrap redirect
                 q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
                 url = q.get("uddg", [url])[0]
-            root = url.split("?")[0]
+            host = urllib.parse.urlparse(url).hostname or ""
+            if (host == "duckduckgo.com" or host.endswith(".duckduckgo.com")
+                    or not url.startswith(("https://", "http://")) or not title):
+                continue
+            root = url.split("#")[0]
             if root in seen:
                 continue
             seen.add(root)
@@ -221,6 +224,9 @@ def mojeek_search(query, n):
 
 
 def search(query, n):
+    job_query = re.fullmatch(r'\s*"?([^"\n]+?)"?\s+"([^"]+)"\s+(?:careers|jobs)\s*', query)
+    if job_query:
+        return find_jobs(job_query[1], job_query[2], n)[0]
     hits = ollama_web_search(query, n)
     if hits:
         return hits
@@ -232,6 +238,138 @@ def search(query, n):
         if hits:
             return hits
     return []
+
+
+def employer_site(company):
+    path = os.path.join(os.path.dirname(__file__), "employer-sites.json")
+    with open(path, encoding="utf-8") as source:
+        sites = json.load(source)
+    for key, site in sites.items():
+        if company.strip().casefold() in [x.casefold() for x in [key] + site["aliases"]]:
+            return site
+    return None
+
+
+def official_url(url, site):
+    """Exact host and path-boundary checks, including the ATS employer tenant."""
+    if not site:
+        return False
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or parsed.username or parsed.password or parsed.port not in (None, 443):
+        return False
+    path = urllib.parse.unquote(parsed.path)
+    if any(p in (".", "..") for p in path.split("/")) or "\\" in path:
+        return False
+    for prefix in site["allowed_prefixes"]:
+        trusted = urllib.parse.urlsplit(prefix)
+        root = trusted.path.rstrip("/")
+        if parsed.hostname == trusted.hostname and (path == root or path.startswith(root + "/")):
+            return True
+    return False
+
+
+def find_jobs(company, role, n=5):
+    """Return only registered employer/ATS URLs; never substitute an aggregator."""
+    site = employer_site(company)
+    if not site:
+        return [], [{"status": "unverified_employer", "company": company}], []
+    for title, url in site.get("roles", {}).items():
+        if title.casefold().replace("&", "and") == role.casefold().replace("&", "and") and official_url(url, site):
+            return [(title, url, "User-confirmed employer listing; current vacancy status unchecked.")], [
+                {"provider": "verified_employer_registry", "accepted": 1}], []
+    def words(value):
+        value = value.lower().replace("&", " and ")
+        value = re.sub(r"\bm\s+and\s+s\b", "marks and spencer", value)
+        return set(re.findall(r"[a-z0-9]+", value)) - {"and", "of", "the"}
+
+    employer = words(company) - {"brands"}
+    title_words = words(role)
+    queries = list(dict.fromkeys([
+        f'site:{prefix.removeprefix("https://")} "{role}"'
+        for prefix in site["allowed_prefixes"]
+    ]))
+    matches, seen, attempts = [], set(), []
+    for query in queries:
+        for provider_name in ("ollama_web_search", "ddg_search", "bing_rss_search", "mojeek_search"):
+            provider = globals()[provider_name]
+            try:
+                hits = provider(query, max(n, 10)) or []
+                accepted = 0
+                for title, url, snippet in hits:
+                    parsed = urllib.parse.urlparse(url)
+                    if not official_url(url, site):
+                        continue
+                    text = words(title + " " + snippet + " " + urllib.parse.unquote(url))
+                    if not title_words <= text:
+                        continue
+                    if url in seen:
+                        continue
+                    seen.add(url)
+                    matches.append((title, url, snippet))
+                    accepted += 1
+                attempts.append({"provider": provider_name, "query": query,
+                                 "returned": len(hits), "accepted": accepted})
+            except Exception as exc:
+                attempts.append({"provider": provider_name, "query": query,
+                                 "error": str(exc)})
+            if len(matches) >= n:
+                return matches[:n], attempts, queries
+    return matches[:n], attempts, queries
+
+
+def save_job_links(company, role, folder):
+    hits, attempts, queries = find_jobs(company, role)
+    site = employer_site(company)
+    lines = [f"# Job links — {company}: {role}", "",
+             "Only verified employer or employer-specific ATS URLs. Vacancy status unchecked.", ""]
+    for title, url, _ in hits:
+        lines.extend([f"- [{title}]({url})", ""])
+    if not hits:
+        lines.append("No exact role URL found. No third-party listing has been substituted.")
+    if site:
+        lines.extend(["", f"Employer careers page (not an exact role match): {site['careers']}"])
+    else:
+        lines.append("Employer website unverified. Add its confirmed careers URL to scripts/employer-sites.json before searching.")
+    lines.extend(["", "## Browser searches", ""])
+    for query in queries:
+        lines.append("- https://duckduckgo.com/?q=" + urllib.parse.quote(query))
+    lines.extend(["", "Open a listing, copy the advert into job-ad.md, then use /reload."])
+    write(os.path.join(folder, "job-links.md"), "\n".join(lines) + "\n")
+    links = [(title, url) for title, url, _ in hits]
+    if site:
+        links.append(("Employer careers page — not an exact role match", site["careers"]))
+    links += [("Search in browser: " + query,
+               "https://duckduckgo.com/?q=" + urllib.parse.quote(query)) for query in queries]
+    page = '<!doctype html><meta charset="utf-8"><title>Job links</title>'
+    page += '<style>body{font:18px system-ui;max-width:850px;margin:40px auto;padding:20px}li{margin:20px 0}</style>'
+    page += '<h1>' + html.escape(company + ': ' + role) + '</h1>'
+    page += '<p>Verified employer sources only; vacancy status unchecked. Copy the advert into job-ad.md.</p>'
+    if not hits:
+        page += '<p>No exact role URL found. No third-party listing substituted.</p>'
+    if not site:
+        page += '<p>Employer website unverified. Register its confirmed careers URL first.</p>'
+    page += '<ul>'
+    page += ''.join('<li><a href="' + html.escape(url, quote=True) + '">' + html.escape(title) + '</a></li>'
+                    for title, url in links)
+    write(os.path.join(folder, "job-links.html"), page + '</ul>')
+    write(os.path.join(folder, "job-search.json"), json.dumps(
+        {"retrieved_at": dt.datetime.now().astimezone().isoformat(),
+         "matches": hits, "attempts": attempts}, indent=2))
+    return "\n".join(lines)
+
+
+def import_job_url(url, folder):
+    """Keep source and full extracted text for review; never overwrite a pasted ad."""
+    write(os.path.join(folder, "job-source.url"), url + "\n")
+    try:
+        text = strip_html(_get(url))
+        if len(text) < 200:
+            raise ValueError("page contains too little text; it may require JavaScript")
+        dest = os.path.join(folder, "job-ad-fetched.md")
+        write(dest, f"Source: {url}\n\n{text}\n")
+        return f"Fetched {len(text)} characters to {dest}. Review, then import with --jd."
+    except Exception as exc:
+        return f"Could not extract advert ({exc}). Open {url} and paste into job-ad.md."
 
 
 def research(query, n=5, chars=3500):
@@ -365,6 +503,8 @@ Commands
   /jd                open the job-ad file in your editor, then reload it
   /reload            re-read job-ad.md, research.md and MASTER_PROFILE.md
   /research <query>  web search, save to research.md and add to context
+  /find-jobs         find candidate URLs for this employer and role
+  /fetch <url>       save advert text for review, retaining its source URL
   /save [file]       save the last reply (default: <mode>-<timestamp>.md)
   /save! <file>      save the last reply, overwriting
   /open              open the application folder
@@ -437,7 +577,20 @@ def main():
     p.add_argument("--temp", type=float, default=0.4)
     p.add_argument("--ask", default="", help="run one prompt non-interactively and exit")
     p.add_argument("--research", default="", help="run a web search into research.md and exit")
+    p.add_argument("--find-jobs", action="store_true", help="save job links; no model required")
+    p.add_argument("--fetch-jd", default="", help="fetch an advert URL for review; no model required")
     a = p.parse_args()
+
+    if a.find_jobs or a.fetch_jd or a.research:
+        s = Session(a)
+        if a.find_jobs:
+            print(save_job_links(s.company, s.role, s.dir))
+        if a.fetch_jd:
+            print(import_job_url(a.fetch_jd, s.dir))
+        if a.research:
+            with open(s.research_path, "a", encoding="utf-8") as f:
+                f.write(research(a.research))
+        return 0
 
     models = ollama_models()
     if not models:
@@ -524,6 +677,10 @@ def main():
             info("job ad reloaded")
         elif cmd == "/reload":
             info("profile, job ad and research reloaded")
+        elif cmd == "/find-jobs":
+            print(save_job_links(s.company, s.role, s.dir))
+        elif cmd == "/fetch":
+            print(import_job_url(arg, s.dir))
         elif cmd == "/research":
             if not arg:
                 arg = f"{s.company} {s.role}".strip()

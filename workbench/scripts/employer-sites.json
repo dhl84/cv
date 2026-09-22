@@ -1,0 +1,60 @@
+{
+  "elasticstage": {
+    "aliases": [
+      "elasticStage"
+    ],
+    "careers": "https://apply.workable.com/elasticstage/",
+    "allowed_prefixes": [
+      "https://apply.workable.com/elasticstage/"
+    ],
+    "verified_by": "User supplied employer ATS URL, 2026-09-21",
+    "roles": {
+      "Finance Operations and Strategy Manager": "https://apply.workable.com/elasticstage/j/5BE05B35AD/"
+    }
+  },
+  "aga khan foundation": {
+    "aliases": [
+      "Aga Khan Foundation",
+      "AKF"
+    ],
+    "careers": "https://akf.org/careers/",
+    "allowed_prefixes": [
+      "https://akf.org/careers/",
+      "https://www.the.akdn/careers/2291932"
+    ],
+    "verified_by": "User supplied careers URL; application link checked on akf.org/careers, 2026-09-21",
+    "roles": {
+      "Head of Finance & Administration": "https://www.the.akdn/careers/2291932"
+    }
+  },
+  "nala": {
+    "aliases": [
+      "NALA",
+      "NALA Money"
+    ],
+    "careers": "https://apply.workable.com/nalamoney/",
+    "allowed_prefixes": [
+      "https://apply.workable.com/nalamoney/"
+    ],
+    "verified_by": "User supplied employer ATS URL, 2026-09-21",
+    "roles": {
+      "Strategy & Operations Manager": "https://apply.workable.com/nalamoney/j/687D1B44AD/"
+    }
+  },
+  "marks and spencer": {
+    "aliases": [
+      "M&S",
+      "M&S Brands",
+      "Marks and Spencer",
+      "Marks & Spencer"
+    ],
+    "careers": "https://jobs.marksandspencer.com/",
+    "allowed_prefixes": [
+      "https://jobs.marksandspencer.com/"
+    ],
+    "verified_by": "Employer listing checked and user confirmed, 2026-09-21",
+    "roles": {
+      "Senior Finance Manager": "https://jobs.marksandspencer.com/job-search/support-functions/london-greater-london/senior-finance-manager-brands/300008065406218"
+    }
+  }
+}
